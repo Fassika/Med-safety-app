@@ -40,12 +40,10 @@ def download_file_from_hf(repo_id: str, filename: str, dest_path: str = "."):
         return None
 
 # --- Data and Model Loading ---
-# Define repository and filenames
 DATA_REPO_ID = "FassikaF/medical-safety-app-data" 
 DB_FILENAME = "ddi_database.db"
 NDC_FILENAME = "drug_names.txt"
 
-# Execute downloads
 db_path = download_file_from_hf(DATA_REPO_ID, DB_FILENAME)
 ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
 
@@ -54,7 +52,6 @@ def load_ner_model():
     """Loads the lightweight NER model, cached for performance."""
     try:
         st.info("Loading NER model...")
-        # Use a smaller, more memory-efficient model
         ner_pipeline = pipeline(
             "ner",
             model="dslim/bert-base-NER",
@@ -84,30 +81,32 @@ def load_drug_names_from_txt(filepath: str):
         st.error(f"Failed to load or parse drug name file: {e}")
         return set()
 
-# Load the resources
 ner_pipeline = load_ner_model()
 ndc_drug_names = load_drug_names_from_txt(ndc_path)
 
 # --- Core Logic Functions ---
 def extract_terms(text: str):
     """Extracts medical terms using NER and a dictionary lookup."""
-    if not text.strip() or not ner_pipeline:
+    if not text.strip():
         return []
     
     found_terms = set()
     lower_text = text.strip().lower()
 
-    try:
-        entities = ner_pipeline(text)
-        for entity in entities:
-            # The model might extract multi-word entities, we take the core word.
-            found_terms.add(entity['word'].strip().lower().replace("##", ""))
-    except Exception as e:
-        st.error(f"NER extraction failed: {e}")
-
+    # Layer 1: Dictionary Lookup (Primary Method)
     for drug in ndc_drug_names:
         if re.search(r'\b' + re.escape(drug) + r'\b', lower_text):
             found_terms.add(drug)
+
+    # Layer 2: NER Model (Secondary/Backup Method)
+    if ner_pipeline:
+        try:
+            entities = ner_pipeline(text)
+            for entity in entities:
+                found_terms.add(entity['word'].strip().lower().replace("##", ""))
+        except Exception:
+            # Silently fail if NER has issues, as dictionary is primary
+            pass
     
     return list(found_terms)
 
@@ -145,35 +144,41 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
             json={
                 "model": "kin/kimi-k2-free",
-                "messages": [{"role": "user", "content": prompt}]
+                "messages": [
+                    {"role": "system", "content": "You are a helpful medical safety assistant."},
+                    {"role": "user", "content": prompt}
+                ]
             }
         )
         response.raise_for_status()
         result = response.json()
         return result['choices'][0]['message']['content'].strip()
     except requests.exceptions.RequestException as e:
-        st.error(f"API Error: Could not connect to OpenRouter. {e}")
+        st.error(f"API Error: {e}")
         return "Error retrieving detailed analysis from the API."
 
 # --- Streamlit User Interface ---
 st.title("🧠 Medical Safety Assistant")
-st.markdown("Check for potential interactions between your health profile and new medications. *This tool is for informational purposes only.*")
+st.markdown("Check for potential interactions. *This tool is for informational purposes only.*")
 
 st.subheader("Enter Your Information")
 col1, col2 = st.columns(2)
 with col1:
-    current_input = st.text_area("💊 Current Profile", height=150, placeholder="e.g., chloroquine, diabetes")
+    current_input = st.text_area("💊 Current Profile", height=150, placeholder="e.g., Fleroxacin")
 with col2:
-    new_input = st.text_area("➕ New Addition", height=150, placeholder="e.g., digoxin")
+    new_input = st.text_area("➕ New Addition", height=150, placeholder="e.g., Fenoprofen")
 
 if st.button("🔎 Analyze for Safety", use_container_width=True):
     if not current_input.strip() or not new_input.strip():
         st.warning("Please fill in both fields.")
     else:
-        with st.spinner("Analyzing... This may take a moment."):
+        with st.spinner("Analyzing..."):
             current_terms = extract_terms(current_input)
             new_terms = extract_terms(new_input)
 
