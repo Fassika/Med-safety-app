@@ -152,13 +152,16 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "HTTP-Referer": your_app_url, "X-Title": "Medical Safety Assistant"}
     prompt = f"""
     You are a medical safety assistant providing a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a known {level} interaction level.
+
+    Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
+    Do not leave any sentence unfinished.
+    
     Structure your response with these four sections:
     - Mechanism: The pharmacokinetic or pharmacodynamic basis.
     - Side Effects: Specific adverse effects of the interaction.
     - Management: Recommendations for monitoring or mitigation.
     - Confidence Level: A qualitative assessment (e.g., High, Moderate, Low) based on established evidence.
-    Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
-    Do not leave any sentence unfinished.
+    
     """
     json_payload = {"model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", "max_tokens": 300, "messages": [{"role": "system", "content": "You are a helpful medical safety assistant."}, {"role": "user", "content": prompt}]}
     try:
@@ -217,6 +220,7 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
 
 
 
