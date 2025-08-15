@@ -86,7 +86,7 @@ ndc_drug_names = load_drug_names_from_txt(ndc_path)
 
 # --- Core Logic Functions ---
 def extract_terms(text: str):
-    """Extracts medical terms using NER and a dictionary lookup."""
+    """Extracts medical terms using a dictionary lookup first, then NER."""
     if not text.strip():
         return []
     
@@ -99,13 +99,12 @@ def extract_terms(text: str):
             found_terms.add(drug)
 
     # Layer 2: NER Model (Secondary/Backup Method)
-    if ner_pipeline:
+    if ner_pipeline and not found_terms: # Only run NER if dictionary fails
         try:
             entities = ner_pipeline(text)
             for entity in entities:
                 found_terms.add(entity['word'].strip().lower().replace("##", ""))
         except Exception:
-            # Silently fail if NER has issues, as dictionary is primary
             pass
     
     return list(found_terms)
@@ -125,15 +124,14 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    """Calls the OpenRouter API with required headers and better error handling."""
+    """Calls the OpenRouter API with a valid model ID and required headers."""
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
 
-    
-    # You MUST replace the placeholder with your actual Streamlit app's URL
-    your_app_url = "https://med-safety-app.streamlit.app/" 
+    # You can keep this generic or update it to your final app URL
+    your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -153,7 +151,8 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     """
     
     json_payload = {
-        "model": "moonshotai/kimi-k2:free",
+        # --- THIS IS THE FIX ---
+        "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", # A valid, powerful, and free model
         "messages": [
             {"role": "system", "content": "You are a helpful medical safety assistant."},
             {"role": "user", "content": prompt}
@@ -166,22 +165,17 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
             headers=headers,
             json=json_payload
         )
-        # This will check for HTTP errors (like 400, 401, 500)
         response.raise_for_status() 
         result = response.json()
         return result['choices'][0]['message']['content'].strip()
     
     except requests.exceptions.RequestException as e:
-        # --- ENHANCED ERROR LOGGING ---
-        # This will print the server's exact error message in the Streamlit UI
         error_details = "No additional details in response."
         if e.response is not None:
             try:
-                # Try to parse the error response as JSON
                 error_json = e.response.json()
                 error_details = json.dumps(error_json, indent=2)
             except json.JSONDecodeError:
-                # Fallback to plain text if it's not JSON
                 error_details = e.response.text
                 
         st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
@@ -194,9 +188,9 @@ st.markdown("Check for potential interactions. *This tool is for informational p
 st.subheader("Enter Your Information")
 col1, col2 = st.columns(2)
 with col1:
-    current_input = st.text_area("💊 Current Profile", height=150, placeholder="e.g., Fleroxacin")
+    current_input = st.text_area("💊 Current Profile", height=150, placeholder="e.g., Warfarin")
 with col2:
-    new_input = st.text_area("➕ New Addition", height=150, placeholder="e.g., Fenoprofen")
+    new_input = st.text_area("➕ New Addition", height=150, placeholder="e.g., Aspirin")
 
 if st.button("🔎 Analyze for Safety", use_container_width=True):
     if not current_input.strip() or not new_input.strip():
@@ -234,7 +228,4 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
-
-
-
-
+    
