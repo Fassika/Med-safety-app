@@ -40,70 +40,80 @@ def download_file_from_hf(repo_id: str, filename: str, dest_path: str = "."):
 # --- Data and Model Loading ---
 DATA_REPO_ID = "FassikaF/medical-safety-app-data" 
 DB_FILENAME = "ddi_database.db"
-# --- UPDATED: We now use a JSON map instead of a text file ---
-DRUG_MAP_FILENAME = "drug_map.json"
+NDC_FILENAME = "drug_names.txt" # Reverting to the text file
 
 db_path = download_file_from_hf(DATA_REPO_ID, DB_FILENAME)
-drug_map_path = download_file_from_hf(DATA_REPO_ID, DRUG_MAP_FILENAME)
+ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
 
 @st.cache_resource
 def load_ner_model():
-    """Loads the lightweight NER model, cached for performance."""
+    """
+    Loads the powerful but memory-intensive biomedical NER model.
+    WARNING: This is likely to exceed the memory limits of the Streamlit free tier.
+    """
     try:
-        st.info("Loading NER model...")
-        ner_pipeline = pipeline("ner", model="dslim/bert-base-NER", aggregation_strategy="simple")
-        st.success("✅ NER model loaded.")
+        st.info("Loading Biomedical NER model (this may take a moment)...")
+        # --- REVERTED TO THE LARGE, ACCURATE MODEL ---
+        ner_pipeline = pipeline(
+            "ner",
+            model="d4data/biomedical-ner-all",
+            aggregation_strategy="simple"
+        )
+        st.success("✅ Biomedical NER model loaded.")
         return ner_pipeline
     except Exception as e:
         st.error(f"Fatal: Could not load NER model. Error: {e}")
         return None
 
 @st.cache_resource
-def load_drug_map(filepath: str):
-    """Loads the drug name mapping from a JSON file."""
+def load_drug_names_from_txt(filepath: str):
+    """Loads drug names from a simple text file, cached for performance."""
     if not filepath or not os.path.exists(filepath):
-        st.warning("Drug map file not available.")
-        return {}
+        st.warning("Drug name file not available.")
+        return set()
     
+    drug_set = set()
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            drug_map = json.load(f)
-        st.success(f"✅ Loaded drug map with {len(drug_map)} variations.")
-        return drug_map
+            for line in f:
+                drug_set.add(line.strip())
+        st.success(f"✅ Loaded {len(drug_set)} unique drug names.")
+        return drug_set
     except Exception as e:
-        st.error(f"Failed to load or parse drug map file: {e}")
-        return {}
+        st.error(f"Failed to load or parse drug name file: {e}")
+        return set()
 
 ner_pipeline = load_ner_model()
-drug_map = load_drug_map(drug_map_path) # Load the new map
+ndc_drug_names = load_drug_names_from_txt(ndc_path)
 
 # --- Core Logic Functions ---
 def extract_terms(text: str):
-    """
-    Extracts medical terms using a fast and robust drug name map.
-    This is much more efficient and accurate than the previous method.
-    """
-    if not text.strip() or not drug_map:
+    """Extracts medical terms using the biomedical NER model and a dictionary lookup."""
+    if not text.strip():
         return []
     
     found_terms = set()
-    # Pre-process text: lowercase and split into words, removing basic punctuation
-    words = text.lower().replace(',', ' ').replace('.', ' ').split()
+    lower_text = text.strip().lower()
 
-    # Iterate through the user's input words, not the giant dictionary
-    for word in words:
-        # Check if the word is a known key in our map
-        if word in drug_map:
-            # If it is, add the correct, canonical name to our set
-            found_terms.add(drug_map[word])
-    
-    # Optional: You can still run NER as a last resort if you want, but the map is superior.
-    # For now, we rely on the high-quality map.
+    # Layer 1: Biomedical NER Model (Primary Method)
+    if ner_pipeline:
+        try:
+            entities = ner_pipeline(text)
+            for entity in entities:
+                found_terms.add(entity['word'].strip().lower().replace("##", ""))
+        except Exception as e:
+            st.error(f"NER extraction failed: {e}")
+
+    # Layer 2: Dictionary Lookup (Secondary/Backup Method)
+    for drug in ndc_drug_names:
+        if re.search(r'\b' + re.escape(drug) + r'\b', lower_text):
+            found_terms.add(drug)
     
     return list(found_terms)
 
+
 def query_ddi_database(drug1: str, drug2: str):
-    # This function remains unchanged
+    # This function is unchanged
     if not db_path or not os.path.exists(db_path):
         st.error("Database file not available for query.")
         return None
@@ -117,7 +127,7 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    # This function remains unchanged
+    # This function is unchanged
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
@@ -167,7 +177,7 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
         st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
         return "Error retrieving detailed analysis from the API."
 
-# --- Streamlit User Interface (remains unchanged) ---
+# --- Streamlit User Interface ---
 st.title("🧠 Medical Safety Assistant")
 st.markdown("Check for potential interactions. *This tool is for informational purposes only.*")
 
