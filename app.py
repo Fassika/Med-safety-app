@@ -99,7 +99,7 @@ def extract_terms(text: str):
             found_terms.add(drug)
 
     # Layer 2: NER Model (Secondary/Backup Method)
-    if ner_pipeline and not found_terms: # Only run NER if dictionary fails
+    if ner_pipeline and not found_terms: # Only run NER if dictionary finds nothing
         try:
             entities = ner_pipeline(text)
             for entity in entities:
@@ -124,13 +124,13 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    """Calls the OpenRouter API with a valid model ID and required headers."""
+    """Calls the OpenRouter API with a higher token limit and a refined prompt."""
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
 
-    # You can keep this generic or update it to your final app URL
+    # Make sure this is your app's URL
     your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
 
     headers = {
@@ -140,19 +140,22 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
         "X-Title": "Medical Safety Assistant"
     }
     
+    # Refined prompt for better, more complete output
     prompt = f"""
-    You are a medical safety assistant. Provide a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a {level} interaction level.
-    Include:
+    You are a medical safety assistant providing a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a known {level} interaction level.
+
+    Structure your response with these four sections:
     - Mechanism: The pharmacokinetic or pharmacodynamic basis.
-    - Side Effects: Specific adverse effects.
+    - Side Effects: Specific adverse effects of the interaction.
     - Management: Recommendations for monitoring or mitigation.
-    - Confidence estimate (%) based on established evidence.
-    Do not include disclaimers or closing remarks. If no reliable data, state 'Insufficient data for detailed analysis.' Keep it under 150 words.
+    - Confidence Level: Confidence estimate (%) based on established evidence.
+
+    Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
     """
     
     json_payload = {
-        # --- THIS IS THE FIX ---
-        "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", # A valid, powerful, and free model
+        "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
+        "max_tokens": 300, # Allow for a longer, more complete response
         "messages": [
             {"role": "system", "content": "You are a helpful medical safety assistant."},
             {"role": "user", "content": prompt}
@@ -228,4 +231,3 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
-    
