@@ -153,7 +153,7 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     """
     
     json_payload = {
-        "model": "kin/kimi-k2-free",
+        "model": "moonshotai/kimi-k2-free",
         "messages": [
             {"role": "system", "content": "You are a helpful medical safety assistant."},
             {"role": "user", "content": prompt}
@@ -234,4 +234,5 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
 
