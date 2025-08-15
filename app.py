@@ -151,6 +151,7 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     - Confidence Level: Confidence estimate (%) based on established evidence.
 
     Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
+    Do not leave a sentence unfinished at the end.
     """
     
     json_payload = {
@@ -231,3 +232,4 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
