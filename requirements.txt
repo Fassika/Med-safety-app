@@ -3,6 +3,9 @@ requests
 transformers
 torch
 sentencepiece
+thefuzz
+python-Levenshtein
+
 
 
 
