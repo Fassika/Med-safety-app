@@ -125,12 +125,23 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    """Calls the OpenRouter API to get a detailed analysis of the interaction."""
+    """Calls the OpenRouter API with required headers and better error handling."""
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
 
+    
+    # You MUST replace the placeholder with your actual Streamlit app's URL
+    your_app_url = "https://med-safety-app.streamlit.app/" 
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": your_app_url,
+        "X-Title": "Medical Safety Assistant"
+    }
+    
     prompt = f"""
     You are a medical safety assistant. Provide a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a {level} interaction level.
     Include:
@@ -141,26 +152,39 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     Do not include disclaimers or closing remarks. If no reliable data, state 'Insufficient data for detailed analysis.' Keep it under 150 words.
     """
     
+    json_payload = {
+        "model": "kin/kimi-k2-free",
+        "messages": [
+            {"role": "system", "content": "You are a helpful medical safety assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    }
+
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "kin/kimi-k2-free",
-                "messages": [
-                    {"role": "system", "content": "You are a helpful medical safety assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            }
+            headers=headers,
+            json=json_payload
         )
-        response.raise_for_status()
+        # This will check for HTTP errors (like 400, 401, 500)
+        response.raise_for_status() 
         result = response.json()
         return result['choices'][0]['message']['content'].strip()
+    
     except requests.exceptions.RequestException as e:
-        st.error(f"API Error: {e}")
+        # --- ENHANCED ERROR LOGGING ---
+        # This will print the server's exact error message in the Streamlit UI
+        error_details = "No additional details in response."
+        if e.response is not None:
+            try:
+                # Try to parse the error response as JSON
+                error_json = e.response.json()
+                error_details = json.dumps(error_json, indent=2)
+            except json.JSONDecodeError:
+                # Fallback to plain text if it's not JSON
+                error_details = e.response.text
+                
+        st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
         return "Error retrieving detailed analysis from the API."
 
 # --- Streamlit User Interface ---
@@ -210,3 +234,4 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
