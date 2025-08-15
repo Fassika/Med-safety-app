@@ -46,10 +46,10 @@ ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
 @st.cache_resource
 def load_ner_model():
     try:
-        # No need for st.info here, the download function already does it
+        st.info("Loading NER model...")
         ner_pipeline = pipeline(
             "ner",
-            model="d4data/biomedical-ner-all",
+            model="dslim/bert-base-NER", # <-- NEW, much smaller model
             aggregation_strategy="simple"
         )
         st.success("✅ NER model loaded.")
@@ -97,4 +97,5 @@ def query_ddi_database(drug1: str, drug2: str):
 
 
 # ... (The rest of your app.py file remains exactly the same) ...
+
 
