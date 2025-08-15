@@ -13,16 +13,11 @@ st.set_page_config(page_title="🩺 Medical Safety Assistant", layout="wide", in
 
 # --- NEW: Function to download large files from Hugging Face Hub ---
 def download_file_from_hf(repo_id, filename, dest_path="."):
-    """Downloads a file from a Hugging Face Hub dataset repository."""
+    # ... (this function stays exactly the same) ...
     local_path = Path(dest_path) / filename
-    
-    # Don't download if the file already exists
     if local_path.exists():
         return str(local_path)
-    
-    # Construct the download URL
     url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
-    
     st.info(f"Downloading {filename} from Hugging Face Hub... (this happens once)")
     try:
         with requests.get(url, stream=True) as r:
@@ -37,10 +32,10 @@ def download_file_from_hf(repo_id, filename, dest_path="."):
         return None
 
 # --- NEW: Define your data repository and download files ---
-# IMPORTANT: Replace with your Hugging Face username and dataset name
+
 DATA_REPO_ID = "FassikaF/medical-safety-app-data" 
 DB_FILENAME = "ddi_database.db"
-NDC_FILENAME = "drug-ndc-0001-of-0001.json"
+NDC_FILENAME = "drug_names.txt"
 
 db_path = download_file_from_hf(DATA_REPO_ID, DB_FILENAME)
 ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
@@ -64,31 +59,25 @@ def load_ner_model():
         return None
 
 @st.cache_resource
-def load_ndc_drug_names(filepath):
-    # The function now takes the downloaded file path as an argument
+def load_drug_names_from_txt(filepath):
     if not filepath or not os.path.exists(filepath):
-        st.warning("NDC data file not available.")
+        st.warning("Drug name file not available.")
         return set()
     
     ndc_set = set()
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            # ... (rest of the function is the same)
-            for product in data.get("results", []):
-                if "generic_name" in product:
-                    ndc_set.add(product["generic_name"].strip().lower())
-                if "brand_name" in product:
-                    ndc_set.add(product["brand_name"].strip().lower())
+            for line in f:
+                ndc_set.add(line.strip())
         st.success(f"✅ Loaded {len(ndc_set)} unique drug names.")
         return ndc_set
     except Exception as e:
-        st.error(f"Failed to load or parse NDC drug data: {e}")
+        st.error(f"Failed to load or parse drug name file: {e}")
         return set()
 
 # Load the resources using the downloaded paths
 ner_pipeline = load_ner_model()
-ndc_drug_names = load_ndc_drug_names(ndc_path) # Pass the path here
+ndc_drug_names = load_drug_names_from_txt(ndc_path) # Pass the path here
 
 # --- Helper Functions (Update the database query) ---
 def query_ddi_database(drug1: str, drug2: str):
@@ -108,3 +97,4 @@ def query_ddi_database(drug1: str, drug2: str):
 
 
 # ... (The rest of your app.py file remains exactly the same) ...
+
