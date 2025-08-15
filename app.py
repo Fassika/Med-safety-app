@@ -39,8 +39,8 @@ def download_file_from_hf(repo_id, filename, dest_path="."):
 # --- NEW: Define your data repository and download files ---
 # IMPORTANT: Replace with your Hugging Face username and dataset name
 DATA_REPO_ID = "FassikaF/medical-safety-app-data" 
-DB_FILENAME = "https://huggingface.co/datasets/FassikaF/medical-safety-app-data/resolve/main/ddi_database.db"
-NDC_FILENAME = "https://huggingface.co/datasets/FassikaF/medical-safety-app-data/resolve/main/drug-ndc-0001-of-0001.json"
+DB_FILENAME = "ddi_database.db"
+NDC_FILENAME = "drug-ndc-0001-of-0001.json"
 
 db_path = download_file_from_hf(DATA_REPO_ID, DB_FILENAME)
 ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
@@ -105,5 +105,6 @@ def query_ddi_database(drug1: str, drug2: str):
     result = cursor.fetchone()
     conn.close()
     return {"level": result[0]} if result else None
+
 
 # ... (The rest of your app.py file remains exactly the same) ...
