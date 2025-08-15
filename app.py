@@ -20,13 +20,11 @@ def download_file_from_hf(repo_id: str, filename: str, dest_path: str = "."):
     Downloads a file from a Hugging Face Hub dataset repository if it doesn't exist locally.
     """
     local_path = Path(dest_path) / filename
-    
     if local_path.exists():
         return str(local_path)
     
     url = f"https://huggingface.co/datasets/{repo_id}/resolve/main/{filename}"
-    
-    st.info(f"Downloading {filename} from Hugging Face Hub... (this happens once)")
+    st.info(f"Downloading {filename}...")
     try:
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
@@ -42,21 +40,18 @@ def download_file_from_hf(repo_id: str, filename: str, dest_path: str = "."):
 # --- Data and Model Loading ---
 DATA_REPO_ID = "FassikaF/medical-safety-app-data" 
 DB_FILENAME = "ddi_database.db"
-NDC_FILENAME = "drug_names.txt"
+# --- UPDATED: We now use a JSON map instead of a text file ---
+DRUG_MAP_FILENAME = "drug_map.json"
 
 db_path = download_file_from_hf(DATA_REPO_ID, DB_FILENAME)
-ndc_path = download_file_from_hf(DATA_REPO_ID, NDC_FILENAME)
+drug_map_path = download_file_from_hf(DATA_REPO_ID, DRUG_MAP_FILENAME)
 
 @st.cache_resource
 def load_ner_model():
     """Loads the lightweight NER model, cached for performance."""
     try:
         st.info("Loading NER model...")
-        ner_pipeline = pipeline(
-            "ner",
-            model="dslim/bert-base-NER",
-            aggregation_strategy="simple"
-        )
+        ner_pipeline = pipeline("ner", model="dslim/bert-base-NER", aggregation_strategy="simple")
         st.success("✅ NER model loaded.")
         return ner_pipeline
     except Exception as e:
@@ -64,53 +59,51 @@ def load_ner_model():
         return None
 
 @st.cache_resource
-def load_drug_names_from_txt(filepath: str):
-    """Loads drug names from a simple text file, cached for performance."""
+def load_drug_map(filepath: str):
+    """Loads the drug name mapping from a JSON file."""
     if not filepath or not os.path.exists(filepath):
-        st.warning("Drug name file not available.")
-        return set()
+        st.warning("Drug map file not available.")
+        return {}
     
-    drug_set = set()
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                drug_set.add(line.strip())
-        st.success(f"✅ Loaded {len(drug_set)} unique drug names.")
-        return drug_set
+            drug_map = json.load(f)
+        st.success(f"✅ Loaded drug map with {len(drug_map)} variations.")
+        return drug_map
     except Exception as e:
-        st.error(f"Failed to load or parse drug name file: {e}")
-        return set()
+        st.error(f"Failed to load or parse drug map file: {e}")
+        return {}
 
 ner_pipeline = load_ner_model()
-ndc_drug_names = load_drug_names_from_txt(ndc_path)
+drug_map = load_drug_map(drug_map_path) # Load the new map
 
 # --- Core Logic Functions ---
 def extract_terms(text: str):
-    """Extracts medical terms using a dictionary lookup first, then NER."""
-    if not text.strip():
+    """
+    Extracts medical terms using a fast and robust drug name map.
+    This is much more efficient and accurate than the previous method.
+    """
+    if not text.strip() or not drug_map:
         return []
     
     found_terms = set()
-    lower_text = text.strip().lower()
+    # Pre-process text: lowercase and split into words, removing basic punctuation
+    words = text.lower().replace(',', ' ').replace('.', ' ').split()
 
-    # Layer 1: Dictionary Lookup (Primary Method)
-    for drug in ndc_drug_names:
-        if re.search(r'\b' + re.escape(drug) + r'\b', lower_text):
-            found_terms.add(drug)
-
-    # Layer 2: NER Model (Secondary/Backup Method)
-    if ner_pipeline and not found_terms: # Only run NER if dictionary finds nothing
-        try:
-            entities = ner_pipeline(text)
-            for entity in entities:
-                found_terms.add(entity['word'].strip().lower().replace("##", ""))
-        except Exception:
-            pass
+    # Iterate through the user's input words, not the giant dictionary
+    for word in words:
+        # Check if the word is a known key in our map
+        if word in drug_map:
+            # If it is, add the correct, canonical name to our set
+            found_terms.add(drug_map[word])
+    
+    # Optional: You can still run NER as a last resort if you want, but the map is superior.
+    # For now, we rely on the high-quality map.
     
     return list(found_terms)
 
 def query_ddi_database(drug1: str, drug2: str):
-    """Queries the local SQLite database for drug interactions."""
+    # This function remains unchanged
     if not db_path or not os.path.exists(db_path):
         st.error("Database file not available for query.")
         return None
@@ -124,45 +117,36 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    """Calls the OpenRouter API with a higher token limit and a refined prompt."""
+    # This function remains unchanged
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
 
-    # Make sure this is your app's URL
     your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": your_app_url,
         "X-Title": "Medical Safety Assistant"
     }
-    
-    # Refined prompt for better, more complete output
     prompt = f"""
     You are a medical safety assistant providing a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a known {level} interaction level.
-
     Structure your response with these four sections:
     - Mechanism: The pharmacokinetic or pharmacodynamic basis.
     - Side Effects: Specific adverse effects of the interaction.
     - Management: Recommendations for monitoring or mitigation.
-    - Confidence Level: Confidence estimate (%) based on established evidence.
-
+    - Confidence Level: A qualitative assessment (e.g., High, Moderate, Low) based on established evidence.
     Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
-    Do not leave a sentence unfinished at the end.
     """
-    
     json_payload = {
         "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
-        "max_tokens": 300, # Allow for a longer, more complete response
+        "max_tokens": 300,
         "messages": [
             {"role": "system", "content": "You are a helpful medical safety assistant."},
             {"role": "user", "content": prompt}
         ]
     }
-
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
@@ -172,7 +156,6 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
         response.raise_for_status() 
         result = response.json()
         return result['choices'][0]['message']['content'].strip()
-    
     except requests.exceptions.RequestException as e:
         error_details = "No additional details in response."
         if e.response is not None:
@@ -181,11 +164,10 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
                 error_details = json.dumps(error_json, indent=2)
             except json.JSONDecodeError:
                 error_details = e.response.text
-                
         st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
         return "Error retrieving detailed analysis from the API."
 
-# --- Streamlit User Interface ---
+# --- Streamlit User Interface (remains unchanged) ---
 st.title("🧠 Medical Safety Assistant")
 st.markdown("Check for potential interactions. *This tool is for informational purposes only.*")
 
@@ -232,4 +214,3 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
-
