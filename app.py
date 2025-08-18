@@ -143,39 +143,76 @@ def query_ddi_database(drug1: str, drug2: str):
     return {"level": result[0]} if result else None
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
-    # This function is unchanged
+    """
+    Calls the OpenRouter API with a professionally-tuned prompt to ensure a complete,
+    concise, and clinically relevant analysis.
+    """
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
-        st.error("OpenRouter API key not found.")
+        st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
-    your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "HTTP-Referer": your_app_url, "X-Title": "Medical Safety Assistant"}
-    prompt = f"""
-    You are a medical safety assistant providing a concise, factual explanation of the drug-drug interaction between {drug1} and {drug2}, which has a known {level} interaction level.
 
-    Do not include any other disclaimers or closing remarks. If no reliable data exists, state 'Insufficient data for detailed analysis.'
-    Do not leave any sentence unfinished.
+    your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": your_app_url,
+        "X-Title": "Medical Safety Assistant"
+    }
     
-    Structure your response with these four sections:
-    - Mechanism: The pharmacokinetic or pharmacodynamic basis.
-    - Side Effects: Specific adverse effects of the interaction.
-    - Management: Recommendations for monitoring or mitigation.
-    - Confidence Level: A qualitative assessment (e.g., High, Moderate, Low) based on established evidence.
-    
+    # --- NEW PROFESSIONALLY-TUNED PROMPT ---
+    prompt = f"""
+    You are a clinical pharmacologist's assistant. Your task is to provide a concise, evidence-based summary for a healthcare professional regarding a potential drug-drug interaction.
+
+    **CONTEXT:**
+    - Drug 1: {drug1}
+    - Drug 2: {drug2}
+    - Known Interaction Level: {level}
+
+    **TASK:**
+    Provide a structured analysis of the potential drug-drug interaction. Use the following bullet-point format for your response:
+
+    - **Interaction Summary & Level:** Start with a one-sentence summary of the interaction and confirm its level.
+    - **Mechanism:** Describe the specific Pharmacokinetic (PK) or Pharmacodynamic (PD) basis for the interaction (e.g., CYP enzyme inhibition/induction, additive pharmacologic effects like serotonin syndrome).
+    - **Clinical Implications & Side Effects:** List the key adverse outcomes a clinician should be aware of (e.g., increased bleeding risk, arrhythmias, renal toxicity).
+    - **Clinical Management:** Provide actionable recommendations for monitoring or mitigation (e.g., key monitoring parameters like INR or LFTs, dosage adjustment considerations, alternative therapies).
+
+    **CRITICAL INSTRUCTIONS:**
+    - **Be Concise and Complete:** Prioritize clinically relevant information and ensure every sentence is fully completed.
+    - **Evidence-Based Only:** Summarize only well-documented interactions from established pharmacological literature. Do not speculate or infer unverified risks.
+    - **No Repetition:** Do not repeat information across sections.
+    - **No Disclaimers:** Do not include any general medical advice or phrases like "consult a healthcare provider."
     """
-    json_payload = {"model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo", "max_tokens": 300, "messages": [{"role": "system", "content": "You are a helpful medical safety assistant."}, {"role": "user", "content": prompt}]}
+    
+    json_payload = {
+        "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
+        # Increased token limit slightly to provide a generous buffer for the structured response.
+        "max_tokens": 400, 
+        "messages": [
+            {"role": "system", "content": "You are a helpful medical safety assistant providing expert-level summaries to healthcare professionals."},
+            {"role": "user", "content": prompt}
+        ]
+    }
+
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=json_payload)
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=json_payload
+        )
         response.raise_for_status() 
         result = response.json()
         return result['choices'][0]['message']['content'].strip()
+    
     except requests.exceptions.RequestException as e:
         error_details = "No additional details in response."
         if e.response is not None:
             try:
-                error_details = json.dumps(e.response.json(), indent=2)
+                error_json = e.response.json()
+                error_details = json.dumps(error_json, indent=2)
             except json.JSONDecodeError:
                 error_details = e.response.text
+                
         st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
         return "Error retrieving detailed analysis from the API."
 
@@ -220,6 +257,7 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
 
 
 
