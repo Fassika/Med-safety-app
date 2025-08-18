@@ -1,6 +1,6 @@
 # 🧠 Medical Safety Assistant
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://med-safety-app.streamlit.app/)
 
 The Medical Safety Assistant is an intelligent tool designed to provide a rapid, evidence-based analysis of potential drug-drug interactions (DDIs). Built for healthcare professionals, this application helps clinicians and pharmacists quickly assess the risks of adding a new medication to a patient's existing profile.
 
