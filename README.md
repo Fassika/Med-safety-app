@@ -1,37 +1,61 @@
-🧠 Medical Safety Assistant
-![alt text](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)
+# 🧠 Medical Safety Assistant
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/)
+
 The Medical Safety Assistant is an intelligent tool designed to provide a rapid, evidence-based analysis of potential drug-drug interactions (DDIs). Built for healthcare professionals, this application helps clinicians and pharmacists quickly assess the risks of adding a new medication to a patient's existing profile.
+
 This tool prioritizes accuracy and safety by employing a multi-layered analysis that combines a structured interaction database with the advanced reasoning capabilities of a Large Language Model (LLM), which is strictly instructed to provide information based on established pharmacological literature.
-✨ Key Features
-Multi-Layered Term Extraction: Utilizes a robust three-stage system (canonical map, biomedical NER, and fuzzy matching) to accurately identify medical terms from user input.
-Database-First Approach: First checks for known interactions against a comprehensive DDI database to provide immediate, classified risk levels (Major, Moderate, Minor).
-Advanced LLM Analysis: For interactions found in the database or for general analysis, the app queries a powerful LLM (Nous Hermes 2 Mixtral) to generate a detailed, structured summary.
-Designed for Clinicians: The analysis is tailored for a professional audience, focusing on clinically relevant details like mechanism, side effects, and management strategies.
-⚙️ How It Works
+
+## ✨ Key Features
+
+*   **Multi-Layered Term Extraction:** Utilizes a robust three-stage system (canonical map, biomedical NER, and fuzzy matching) to accurately identify medical terms from user input.
+*   **Database-First Approach:** First checks for known interactions against a comprehensive DDI database to provide immediate, classified risk levels (Major, Moderate, Minor).
+*   **Advanced LLM Analysis:** For interactions found in the database or for general analysis, the app queries a powerful LLM (`Nous Hermes 2 Mixtral`) to generate a detailed, structured summary.
+*   **Designed for Clinicians:** The analysis is tailored for a professional audience, focusing on clinically relevant details like mechanism, side effects, and management strategies.
+
+## ⚙️ How It Works
+
 The application follows a sophisticated, multi-step process to ensure the highest quality output:
-Smart Term Extraction: When a user enters a patient's current profile and a new addition, the system first identifies all relevant medical terms. It uses a three-layer funnel for maximum accuracy:
-Canonical Map: A high-speed drug_map.json instantly catches common misspellings and maps brand names to their generic equivalents (e.g., "Advil" -> "Ibuprofen").
-Biomedical NER: The powerful d4data/biomedical-ner-all model identifies correctly spelled but less common drugs.
-Fuzzy Matching: A "safety net" algorithm finds terms that are close matches to known drugs, catching novel typos (e.g., "asprn" -> "aspirin").
-Database Check for Known Interactions: The extracted terms are then checked against a local SQLite database built from the DDInter database. If a known interaction is found, its official risk level is immediately identified.
-Evidence-Based LLM Analysis: The application then queries the LLM via the OpenRouter API. The model is given a highly structured, evidence-focused prompt with several critical instructions:
-It is commanded to act as a clinical pharmacologist's assistant.
-It must summarize only well-documented interactions from established literature.
-It is strictly forbidden from speculating, hallucinating, or leaving sentences unfinished.
-The output is structured into four key sections: Interaction Summary, Mechanism, Clinical Implications, and Clinical Management.
+
+1.  **Smart Term Extraction:** When a user enters a patient's current profile and a new addition, the system first identifies all relevant medical terms. It uses a three-layer funnel for maximum accuracy:
+    *   **Canonical Map:** A high-speed `drug_map.json` instantly catches common misspellings and maps brand names to their generic equivalents (e.g., "Advil" -> "Ibuprofen").
+    *   **Biomedical NER:** The powerful `d4data/biomedical-ner-all` model identifies correctly spelled but less common drugs.
+    *   **Fuzzy Matching:** A "safety net" algorithm finds terms that are close matches to known drugs, catching novel typos (e.g., "asprn" -> "aspirin").
+
+2.  **Database Check for Known Interactions:** The extracted terms are then checked against a local SQLite database built from the DDInter database. If a known interaction is found, its official risk level is immediately identified.
+
+3.  **Evidence-Based LLM Analysis:** The application then queries the LLM via the OpenRouter API. The model is given a highly structured, evidence-focused prompt with several critical instructions:
+    *   It is commanded to act as a **clinical pharmacologist's assistant**.
+    *   It must **summarize only well-documented interactions** from established literature.
+    *   It is strictly forbidden from speculating, hallucinating, or leaving sentences unfinished.
+    *   The output is structured into four key sections: **Interaction Summary, Mechanism, Clinical Implications, and Clinical Management.**
+
 This ensures that the final analysis is not just a random text generation but a structured, safe, and clinically relevant summary.
-💻 Technology Stack
-Frontend: Streamlit
-Backend Logic: Python
-Data Hosting: Hugging Face Hub (for the DDI database and drug name lists)
-NER Model: d4data/biomedical-ner-all
-LLM Provider: OpenRouter API
-LLM: nousresearch/nous-hermes-2-mixtral-8x7b-dpo
-Core Libraries: transformers, thefuzz, requests
-🚧 Beta Testing & Call for Feedback
-This application is currently in a beta testing phase. While it is designed to be as accurate as possible, it is still under active development.
-We are actively seeking feedback, especially from healthcare professionals (doctors, pharmacists, nurses, medical students, etc.). Your expertise is invaluable in helping us refine the tool's accuracy, usability, and clinical relevance.
-If you have any feedback, suggestions, or find an analysis that seems incorrect, please open an issue on this GitHub repository.
-⚠️ Disclaimer
-This tool is for informational and educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. The information provided by this application is generated by an AI model and may contain inaccuracies.
-Always consult with a qualified healthcare provider before making any decisions related to medication or treatment. The developers of this tool assume no liability for any actions taken based on the information provided by this application.
+
+## 💻 Technology Stack
+
+*   **Frontend:** Streamlit
+*   **Backend Logic:** Python
+*   **Data Hosting:** Hugging Face Hub (for the DDI database and drug name lists)
+*   **NER Model:** `d4data/biomedical-ner-all`
+*   **LLM Provider:** OpenRouter API
+*   **LLM:** `nousresearch/nous-hermes-2-mixtral-8x7b-dpo`
+*   **Core Libraries:** `transformers`, `thefuzz`, `requests`
+
+---
+
+## 🚧 Beta Testing & Call for Feedback
+
+This application is currently in a **beta testing phase**. While it is designed to be as accurate as possible, it is still under active development.
+
+**We are actively seeking feedback, especially from healthcare professionals** (doctors, pharmacists, nurses, medical students, etc.). Your expertise is invaluable in helping us refine the tool's accuracy, usability, and clinical relevance.
+
+If you have any feedback, suggestions, or find an analysis that seems incorrect, please **[open an issue on this GitHub repository](https://github.com/FassikaF/med-safety-app/issues)**.
+
+---
+
+## ⚠️ Disclaimer
+
+**This tool is for informational and educational purposes only.** It is not a substitute for professional medical advice, diagnosis, or treatment. The information provided by this application is generated by an AI model and may contain inaccuracies.
+
+**Always consult with a qualified healthcare provider before making any decisions related to medication or treatment.** The developers of this tool assume no liability for any actions taken based on the information provided by this application.```
