@@ -144,15 +144,16 @@ def query_ddi_database(drug1: str, drug2: str):
 
 def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     """
-    Calls the OpenRouter API with a professionally-tuned prompt to ensure a complete,
-    concise, and clinically relevant analysis.
+    Calls the OpenRouter API with a verified, top-tier model and required headers.
     """
     api_key = st.secrets.get("OPENROUTER_API_KEY")
     if not api_key:
         st.error("OpenRouter API key not found. Please set it in your Streamlit secrets.")
         return "Analysis unavailable: API key is missing."
 
+    # Your app URL (make sure this is correct)
     your_app_url = "https://fassikaf-med-safety-app-app-axpxqg.streamlit.app/"
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -160,7 +161,6 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
         "X-Title": "Medical Safety Assistant"
     }
     
-    # --- NEW PROFESSIONALLY-TUNED PROMPT ---
     prompt = f"""
     You are a clinical pharmacologist's assistant. Your task is to provide a concise, evidence-based summary for a healthcare professional regarding a potential drug-drug interaction.
 
@@ -185,9 +185,10 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
     """
     
     json_payload = {
-        "model": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
-        # Increased token limit slightly to provide a generous buffer for the structured response.
-        "max_tokens": 400, 
+        # --- THIS IS THE FIX ---
+        # Replaced the delisted model with the new, state-of-the-art Llama 3 model.
+        "model": "meta-llama/llama-3-8b-instruct", 
+        "max_tokens": 400,
         "messages": [
             {"role": "system", "content": "You are a helpful medical safety assistant providing expert-level summaries to healthcare professionals."},
             {"role": "user", "content": prompt}
@@ -216,7 +217,8 @@ def get_llm_details_from_openrouter(drug1: str, drug2: str, level: str):
         st.error(f"API Error: {e}\n\nServer Response:\n```\n{error_details}\n```")
         return "Error retrieving detailed analysis from the API."
 
-# --- Streamlit User Interface (unchanged) ---
+
+# --- Streamlit User Interface  ---
 st.title("🧠 Medical Safety Assistant")
 st.markdown("Check for potential interactions. *This tool is for informational purposes only.*")
 st.subheader("Enter Your Information")
@@ -257,6 +259,7 @@ if st.button("🔎 Analyze for Safety", use_container_width=True):
                 st.error("Could not detect enough medical terms to perform an analysis.")
 else:
     st.info("Enter your information and click the 'Analyze' button to see results.")
+
 
 
 
